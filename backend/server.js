@@ -6,7 +6,6 @@
 'use strict';
 
 require('dotenv').config();
-const { execFile } = require('child_process');
 const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
@@ -14,6 +13,7 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 const db = require('./db');
+const { runModel, createTempCsv, removeTempFile, PYTHON_BIN } = require('./pythonRunner');
 
 if (!process.env.JWT_SECRET) {
   if (process.env.NODE_ENV === 'production') {
@@ -27,18 +27,51 @@ if (!process.env.JWT_SECRET) {
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+const HOST = '0.0.0.0';
 
 /* ── CORS ─────────────────────────────────────────────────────────────────── */
+const allowedOriginsConfig = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(s => s.trim().toLowerCase())
+  .filter(Boolean);
+
+if (process.env.FRONTEND_URL) {
+  allowedOriginsConfig.push(process.env.FRONTEND_URL.trim().toLowerCase());
+}
+
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return callback(null, true);
+    const lower = origin.toLowerCase();
+    // Allow local development
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(lower)) return callback(null, true);
     if (origin === 'null') return callback(null, true);
+    // Allow explicitly configured origins
+    if (allowedOriginsConfig.some(allowed => lower === allowed || lower.startsWith(allowed))) {
+      return callback(null, true);
+    }
+    // Allow standard Firebase Hosting domains
+    if (/^https:\/\/[a-z0-9\-]+\.(web\.app|firebaseapp\.com)$/.test(lower)) {
+      return callback(null, true);
+    }
     callback(new Error(`CORS blocked: ${origin}`));
   },
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true,
 }));
+
+/* ── Security Headers ─────────────────────────────────────────────────────── */
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
 
 app.use(express.json({ limit: '10mb' }));
 
@@ -78,26 +111,23 @@ app.use('/api/procurement', requireAuth, procurementRouter);
 
 /* ── Health ───────────────────────────────────────────────────────────────── */
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', time: new Date().toISOString(), version: '2.0.0' });
+  const dbHealth = db.getDatabaseHealth ? db.getDatabaseHealth() : { status: 'ok' };
+  res.json({
+    status: 'ok',
+    time: new Date().toISOString(),
+    version: '2.0.0',
+    service: 'ForecastAI Decision Intelligence Platform',
+    environment: process.env.NODE_ENV || 'development',
+    database: dbHealth,
+    python: {
+      executable: PYTHON_BIN,
+    },
+  });
 });
 
 /* ── Python runner helper ─────────────────────────────────────────────────── */
 function runPython(inputObj, timeoutMs = 30000) {
-  return new Promise((resolve, reject) => {
-    execFile('py', [path.join(__dirname, 'rf_model.py'), JSON.stringify(inputObj)],
-      { cwd: __dirname, timeout: timeoutMs },
-      (error, stdout, stderr) => {
-        if (error) return reject(new Error(stderr || error.message));
-        try {
-          const result = JSON.parse(stdout.trim());
-          if (result.error) return reject(new Error(result.error));
-          resolve(result);
-        } catch (e) {
-          reject(new Error(`Model parse error: ${stdout.slice(0, 200)}`));
-        }
-      }
-    );
-  });
+  return runModel(inputObj, timeoutMs);
 }
 
 function normalizeRow(row) {
@@ -186,18 +216,9 @@ function runPythonForUser(inputObj, userId, timeoutMs = 30000, datasetId) {
   }
 
   const canonicalHeaders = ['product', 'sales', 'inventory', 'price', 'month', 'demand', 'lead_time'];
-  const tempPath = path.join(__dirname, `_user_${Date.now()}_${Math.random().toString(16).slice(2)}.csv`);
-  const csvValue = value => {
-    const text = String(value ?? '');
-    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-  };
-  fs.writeFileSync(
-    tempPath,
-    [canonicalHeaders.join(','), ...normRows.map(row => canonicalHeaders.map(h => csvValue(row[h])).join(','))].join('\n'),
-    'utf8'
-  );
+  const tempPath = createTempCsv(normRows, canonicalHeaders);
   return runPython({ ...inputObj, csv_path: tempPath }, timeoutMs).finally(() => {
-    try { fs.unlinkSync(tempPath); } catch (_) { }
+    removeTempFile(tempPath);
   });
 }
 
@@ -247,16 +268,8 @@ app.post('/api/upload-forecast', requireAuth, authorize('ADMIN', 'MANAGER'), asy
     return res.status(400).json({ error: 'Last row must have valid sales, inventory, price, month values.' });
   }
 
-  // Write temp CSV to backend dir with canonical headers
-  const tmpPath = path.join(__dirname, `_upload_${Date.now()}.csv`);
   const canonicalHeaders = ['product', 'sales', 'inventory', 'price', 'month', 'demand', 'lead_time'];
-  const csvValue = value => {
-    const text = String(value ?? '');
-    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-  };
-  const csvLines = normalizedRows.map(r => canonicalHeaders.map(h => csvValue(r[h])).join(','));
-  const csvContent = [canonicalHeaders.join(','), ...csvLines].join('\n');
-  fs.writeFileSync(tmpPath, csvContent, 'utf8');
+  const tmpPath = createTempCsv(normalizedRows, canonicalHeaders);
 
   try {
     const result = await runPython({
@@ -268,7 +281,7 @@ app.post('/api/upload-forecast', requireAuth, authorize('ADMIN', 'MANAGER'), asy
       lead_time: Number(last.lead_time || 7),
       csv_path: tmpPath,
     });
-    try { fs.unlinkSync(tmpPath); } catch (_) { }
+    removeTempFile(tmpPath);
     res.json({
       ...result,
       rows_used: normalizedRows.length,
@@ -276,7 +289,7 @@ app.post('/api/upload-forecast', requireAuth, authorize('ADMIN', 'MANAGER'), asy
       product: last.product || 'uploaded-product'
     });
   } catch (err) {
-    try { fs.unlinkSync(tmpPath); } catch (_) { }
+    removeTempFile(tmpPath);
     console.error('[upload-forecast]', err.message);
     res.status(500).json({ error: 'Forecast model failed.', detail: err.message });
   }
@@ -294,13 +307,8 @@ app.post('/api/data-quality', requireAuth, authorize('ADMIN', 'MANAGER'), async 
       if (activeId && activeId !== 'default') {
         const datasets = db.listDatasets(req.user.id);
         const dataset = datasets.find(item => item.id === activeId);
-        if (dataset) {
-          const csvValue = value => {
-            const text = String(value ?? '');
-            return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-          };
-          tmpPath = path.join(__dirname, `_quality_${Date.now()}.csv`);
-          fs.writeFileSync(tmpPath, [dataset.headers.join(','), ...dataset.rows.map(row => dataset.headers.map(header => csvValue(row[header])).join(','))].join('\n'), 'utf8');
+        if (dataset && Array.isArray(dataset.rows) && dataset.rows.length) {
+          tmpPath = createTempCsv(dataset.rows, dataset.headers || Object.keys(dataset.rows[0]));
         }
       }
     } else {
@@ -308,23 +316,17 @@ app.post('/api/data-quality', requireAuth, authorize('ADMIN', 'MANAGER'), async 
         return res.status(400).json({ success: false, error: { code: 'EMPTY_DATASET', message: 'The uploaded CSV contains no data rows.' } });
       }
       const headers = Object.keys(rows[0]);
-      const csvValue = value => {
-        const text = String(value ?? '');
-        return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-      };
-      const csvLines = rows.map(row => headers.map(header => csvValue(row[header])).join(','));
-      tmpPath = path.join(__dirname, `_quality_${Date.now()}.csv`);
-      fs.writeFileSync(tmpPath, [headers.join(','), ...csvLines].join('\n'), 'utf8');
+      tmpPath = createTempCsv(rows, headers);
     }
 
     const result = await runPython({
       mode: 'quality',
       csv_path: tmpPath || path.join(__dirname, 'data.csv'),
     });
-    if (tmpPath) try { fs.unlinkSync(tmpPath); } catch (_) { }
+    if (tmpPath) removeTempFile(tmpPath);
     res.json(result);
   } catch (err) {
-    if (tmpPath) try { fs.unlinkSync(tmpPath); } catch (_) { }
+    if (tmpPath) removeTempFile(tmpPath);
     res.status(500).json({ error: 'Quality analysis failed.', detail: err.message });
   }
 });
@@ -371,11 +373,12 @@ app.use((err, req, res, next) => {
 });
 
 /* ── Start ────────────────────────────────────────────────────────────────── */
-app.listen(PORT, () => {
-  console.log(`\n🚀 ForecastAI backend v2.0 running on http://localhost:${PORT}`);
-  console.log(`   Health:       GET  http://localhost:${PORT}/api/health`);
-  console.log(`   Forecast:     POST http://localhost:${PORT}/api/forecast`);
-  console.log(`   Dashboard:    GET  http://localhost:${PORT}/api/intelligence/dashboard`);
-  console.log(`   Models:       GET  http://localhost:${PORT}/api/models`);
-  console.log(`   Copilot:      POST http://localhost:${PORT}/api/intelligence/copilot\n`);
+app.listen(PORT, HOST, () => {
+  console.log(`\n🚀 ForecastAI backend v2.0 running on http://${HOST}:${PORT}`);
+  console.log(`   Health:       GET  http://${HOST}:${PORT}/api/health`);
+  console.log(`   Forecast:     POST http://${HOST}:${PORT}/api/forecast`);
+  console.log(`   Dashboard:    GET  http://${HOST}:${PORT}/api/intelligence/dashboard`);
+  console.log(`   Models:       GET  http://${HOST}:${PORT}/api/models`);
+  console.log(`   Copilot:      POST http://${HOST}:${PORT}/api/intelligence/copilot\n`);
 });
+

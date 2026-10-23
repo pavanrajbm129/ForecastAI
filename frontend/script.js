@@ -2,9 +2,11 @@
    ForecastAI Enterprise — script.js v3.0
    All data from real backend APIs. No hardcoded product arrays.
    ================================================================ */
+const API = (window.__FORECASTAI_CONFIG__ && window.__FORECASTAI_CONFIG__.apiBase) ||
+  ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:4000/api'
+    : '/api');
 
-const API = 'http://localhost:4000/api';
-let currentUser = null;
 const ROLE_PAGES = {
   ADMIN: ['dashboard', 'intelligence-center', 'forecast', 'upload', 'analytics', 'alerts', 'ml', 'reports', 'settings', 'scenario-lab', 'copilot', 'action-center', 'model-lab', 'audit', 'data-quality', 'user-management', 'procurement', 'purchase-requests', 'purchase-orders', 'suppliers', 'deliveries', 'inventory-transactions'],
   MANAGER: ['dashboard', 'intelligence-center', 'forecast', 'upload', 'analytics', 'alerts', 'ml', 'reports', 'scenario-lab', 'copilot', 'action-center', 'audit', 'data-quality', 'procurement', 'purchase-requests', 'purchase-orders', 'suppliers', 'deliveries', 'inventory-transactions'],
@@ -3413,9 +3415,21 @@ function logoutUser() {
 }
 
 async function testApiConnection() {
+  const input = document.getElementById('settingsApiUrl');
+  let targetUrl = (input && input.value.trim()) || API;
   try {
-    await apiFetch(`${API}/health`);
-    showToast('✓ Backend connection successful');
+    let cleanBase = targetUrl.replace(/\/+$/, '');
+    if (!cleanBase.endsWith('/api')) cleanBase += '/api';
+    const healthUrl = cleanBase + '/health';
+    const res = await fetch(healthUrl);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (window.__FORECASTAI_CONFIG__) {
+      window.__FORECASTAI_CONFIG__.setApiBase(cleanBase);
+    } else {
+      localStorage.setItem('forecastai_api_url', cleanBase);
+    }
+    showToast(`✓ Backend connection successful (${data.version || 'v2.0'})`);
   } catch (err) {
     showToast('✗ Cannot reach backend: ' + err.message);
   }
@@ -3426,8 +3440,16 @@ async function testApiConnection() {
    ================================================================ */
 document.addEventListener('DOMContentLoaded', () => {
 
+  /* Populate settings API URL */
+  const apiInput = document.getElementById('settingsApiUrl');
+  if (apiInput) {
+    const currentBase = (window.__FORECASTAI_CONFIG__ && window.__FORECASTAI_CONFIG__.apiBase) || API;
+    apiInput.value = currentBase.replace(/\/api$/, '') || currentBase;
+  }
+
   /* Restore dark mode */
   if (localStorage.getItem('darkMode') === '1') setDarkMode(true);
+
 
   /* User greeting */
   try {
@@ -3728,7 +3750,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     } catch (err) {
       hideLoading();
-      if (msg) { msg.className = 'validation-msg error'; msg.textContent = `✗ Forecast failed: ${err.message}. Make sure the backend is running on port 4000.`; }
+      if (msg) { msg.className = 'validation-msg error'; msg.textContent = `✗ Forecast failed: ${err.message}. Make sure the backend server is running and reachable.`; }
       showToast('Forecast failed — check backend connection or file structure');
     } finally {
       isUploadForecastRunning = false;

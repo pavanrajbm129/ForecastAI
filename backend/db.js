@@ -402,10 +402,58 @@ function invalidateOtps(identifier) {
   save(db);
 }
 
-/* ── Helpers ────────────────────────────────────────────────────────────── */
+/* ── Audits ─────────────────────────────────────────────────────────────── */
+const AUDIT_PATH = path.join(__dirname, 'audit.json');
+
+function listAudits() {
+  if (!fs.existsSync(AUDIT_PATH)) {
+    fs.writeFileSync(AUDIT_PATH, JSON.stringify([], null, 2));
+    return [];
+  }
+  try {
+    return JSON.parse(fs.readFileSync(AUDIT_PATH, 'utf8'));
+  } catch (_) {
+    return [];
+  }
+}
+
+function insertAudit(entry) {
+  const entries = listAudits();
+  const record = {
+    id: `audit_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    timestamp: new Date().toISOString(),
+    ...entry,
+  };
+  entries.unshift(record);
+  if (entries.length > 500) entries.splice(500);
+  try {
+    fs.writeFileSync(AUDIT_PATH, JSON.stringify(entries, null, 2));
+  } catch (_) {}
+  return record;
+}
+
+function getDatabaseHealth() {
+  const isFirestore = process.env.DATABASE_TYPE === 'firestore';
+  const data = load();
+  return {
+    status: 'ok',
+    adapter: isFirestore ? 'firestore' : 'file',
+    storageMode: isFirestore ? 'Google Cloud Firestore' : 'JSON File Store (data.json)',
+    records: {
+      users: (data.users || []).length,
+      datasets: (data.datasets || []).length,
+      suppliers: (data.suppliers || []).length,
+      purchaseRequests: (data.purchaseRequests || []).length,
+      purchaseOrders: (data.purchaseOrders || []).length,
+      audits: listAudits().length,
+    },
+  };
+}
+
 function normalisePhone(p) {
   return (p || '').replace(/[\s\-().]/g, '');
 }
+
 
 module.exports = {
   findUserByEmail,
@@ -447,4 +495,8 @@ module.exports = {
   normalisePhone,
   getUserPreferences,
   updateUserPreferences,
+  listAudits,
+  insertAudit,
+  getDatabaseHealth,
 };
+

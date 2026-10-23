@@ -19,16 +19,14 @@
 'use strict';
 
 const express = require('express');
-const { execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const db = require('../db');
 const { requireAuth, authorize } = require('../middleware/auth');
+const { runModel, createTempCsv, removeTempFile } = require('../pythonRunner');
 
 const router = express.Router();
-const RF_MODEL = path.join(__dirname, '..', 'rf_model.py');
 const DATA_CSV = path.join(__dirname, '..', 'data.csv');
-const AUDIT_FILE = path.join(__dirname, '..', 'audit.json');
 const PRODUCT_FORECAST_CACHE = new Map();
 const PRODUCT_FORECAST_TTL_MS = 30000;
 
@@ -61,41 +59,16 @@ router.use(requireAuth);
 
 // ── Python runner ────────────────────────────────────────────────────────────
 function runPython(inputObj, timeoutMs = 30000) {
-  return new Promise((resolve, reject) => {
-    const modelInput = { ...inputObj };
-    const datasetRows = modelInput.__datasetRows;
-    delete modelInput.__datasetRows;
-    let temporaryPath = null;
-    if (Array.isArray(datasetRows) && datasetRows.length) {
-      temporaryPath = path.join(__dirname, `../_user_model_${Date.now()}_${Math.random().toString(16).slice(2)}.csv`);
-      const headers = Object.keys(datasetRows[0]);
-      const csvValue = value => {
-        const text = String(value ?? '');
-        return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-      };
-      fs.writeFileSync(temporaryPath, [headers.join(','), ...datasetRows.map(row => headers.map(header => csvValue(row[header])).join(','))].join('\n'), 'utf8');
-      modelInput.csv_path = temporaryPath;
-    }
-    const inputStr = JSON.stringify(modelInput);
-    execFile('py', [RF_MODEL, inputStr], { cwd: path.dirname(RF_MODEL), timeout: timeoutMs },
-      (error, stdout, stderr) => {
-        if (temporaryPath) try { fs.unlinkSync(temporaryPath); } catch (_) { }
-        if (error) {
-          try {
-            const pythonResult = JSON.parse(stdout.trim());
-            if (pythonResult.error) return reject(new Error(pythonResult.error));
-          } catch (_) { }
-          return reject(new Error(stderr || error.message));
-        }
-        try {
-          const result = JSON.parse(stdout.trim());
-          if (result.error) return reject(new Error(result.error));
-          resolve(result);
-        } catch (e) {
-          reject(new Error(`Model output parse error: ${stdout.slice(0, 200)}`));
-        }
-      }
-    );
+  const modelInput = { ...inputObj };
+  const datasetRows = modelInput.__datasetRows;
+  delete modelInput.__datasetRows;
+  let temporaryPath = null;
+  if (Array.isArray(datasetRows) && datasetRows.length) {
+    temporaryPath = createTempCsv(datasetRows, Object.keys(datasetRows[0]));
+    modelInput.csv_path = temporaryPath;
+  }
+  return runModel(modelInput, timeoutMs).finally(() => {
+    if (temporaryPath) removeTempFile(temporaryPath);
   });
 }
 
@@ -105,26 +78,17 @@ function runPythonForUser(inputObj, userId, timeoutMs = 30000, datasetId) {
 
 // ── Audit log helpers ────────────────────────────────────────────────────────
 function loadAudit() {
-  if (!fs.existsSync(AUDIT_FILE)) {
-    fs.writeFileSync(AUDIT_FILE, JSON.stringify([], null, 2));
-  }
-  try {
-    return JSON.parse(fs.readFileSync(AUDIT_FILE, 'utf8'));
-  } catch (_) { return []; }
+  return db.listAudits();
 }
 
 function saveAudit(entries) {
-  fs.writeFileSync(AUDIT_FILE, JSON.stringify(entries, null, 2));
+  // Handled through db.insertAudit
 }
 
 function appendAudit(entry) {
-  const entries = loadAudit();
-  entries.unshift({ id: `audit_${Date.now()}`, timestamp: new Date().toISOString(), ...entry });
-  // Keep last 500 entries
-  if (entries.length > 500) entries.splice(500);
-  saveAudit(entries);
-  return entries[0];
+  return db.insertAudit(entry);
 }
+
 
 function normalizeRow(row) {
   if (!row || typeof row !== 'object') return null;

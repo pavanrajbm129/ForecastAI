@@ -16,6 +16,8 @@
     "test-rf": "py rf_model.py \"{\\\"sales\\\":7310,\\\"inventory\\\":980,\\\"price\\\":550,\\\"month\\\":6}\""
   },
   "dependencies": {
+    "@google-cloud/firestore": "^9.4.0",
+    "@google-cloud/storage": "^8.4.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

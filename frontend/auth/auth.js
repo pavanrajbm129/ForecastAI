@@ -1,6 +1,10 @@
 /* ===== AUTH.JS — frontend auth client (talks to real backend) ===== */
 
-const API = 'http://localhost:4000/api/auth';
+const API = (window.__FORECASTAI_CONFIG__ && window.__FORECASTAI_CONFIG__.authBase) ||
+  ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:4000/api/auth'
+    : '/api/auth');
+
 
 /* ================================================================
    API CALLS
