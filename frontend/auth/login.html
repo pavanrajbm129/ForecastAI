@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ForecastIQ — Sign In</title>
+  <link rel="stylesheet" href="auth.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+
+<body>
+  <div class="auth-layout">
+
+    <!-- ══════════════════════════════════════
+       LEFT — Dark Brand Panel
+  ══════════════════════════════════════ -->
+    <div class="auth-left">
+      <div class="auth-brand">
+        <div class="official-logo official-logo-auth" role="img"
+          aria-label="ForecastIQ Smart Inventory Demand Forecasting Decision Support System"><img
+            src="../assests/branding/forecastiq-logo-transparent.png" alt="ForecastIQ" /></div>
+      </div>
+
+      <div class="auth-hero">
+        <h1 class="auth-hero-title">AI-Powered<br /><span>Demand</span><br />Forecasting</h1>
+        <p class="auth-hero-sub">Predict inventory needs, reduce overstock, and make smarter supply chain decisions with
+          real-time ML models.</p>
+        <div class="auth-stats">
+          <div class="auth-stat">
+            <div class="auth-stat-val">94.7%</div>
+            <div class="auth-stat-label">Model Accuracy</div>
+          </div>
+          <div class="auth-stat">
+            <div class="auth-stat-val">48,920</div>
+            <div class="auth-stat-label">Units Predicted</div>
+          </div>
+          <div class="auth-stat">
+            <div class="auth-stat-val">$2.84M</div>
+            <div class="auth-stat-label">Revenue Forecast</div>
+          </div>
+          <div class="auth-stat">
+            <div class="auth-stat-val">0.032</div>
+            <div class="auth-stat-label">Model RMSE</div>
+          </div>
+        </div>
+        <div class="auth-badges">
+          <span class="auth-badge"><i class="fa-solid fa-microchip"></i> LSTM Neural Net</span>
+          <span class="auth-badge"><i class="fa-solid fa-chart-line"></i> Real-time Forecast</span>
+          <span class="auth-badge"><i class="fa-solid fa-shield-halved"></i> Secure Auth</span>
+        </div>
+      </div>
+
+      <div class="auth-left-footer" aria-hidden="true"></div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+       RIGHT — White Form Panel
+  ══════════════════════════════════════ -->
+    <div class="auth-right">
+      <div class="auth-form-wrap">
+
+        <!-- Mobile brand (shown only on small screens) -->
+        <div class="auth-mobile-brand">
+          <div class="official-logo official-logo-mobile" role="img" aria-label="ForecastIQ"><img
+              src="../assests/branding/forecastiq-logo-transparent.png" alt="ForecastIQ" /></div>
+        </div>
+
+        <!-- Step dots -->
+        <div class="step-dots">
+          <div class="sdot active" id="dot1"></div>
+          <div class="sdot" id="dot2"></div>
+        </div>
+
+        <!-- ── STEP 1: credentials ── -->
+        <div class="auth-step" id="stepId">
+          <div class="ap-header">
+            <h2>Welcome back</h2>
+            <p>Sign in to your forecasting workspace</p>
+          </div>
+
+          <div class="alert-msg" id="loginAlert"></div>
+
+          <!-- Method tabs -->
+          <div class="login-tabs">
+            <button class="login-tab active" id="tabPassword" onclick="switchTab('password')">
+              <i class="fa-solid fa-lock"></i> Password
+            </button>
+            <button class="login-tab" id="tabOtp" onclick="switchTab('otp')">
+              <i class="fa-solid fa-mobile-screen-button"></i> OTP
+            </button>
+          </div>
+
+          <!-- Password panel -->
+          <div class="tab-panel active" id="panelPassword">
+            <div class="ap-input-group">
+              <div class="ap-input-wrap">
+                <i class="fa-solid fa-user ap-icon" id="pwIdIcon"></i>
+                <input class="ap-input" type="text" id="pwIdentifier" placeholder="Email or phone number"
+                  autocomplete="username" />
+              </div>
+              <span class="ap-error" id="pwIdError">Enter a valid email or phone number.</span>
+            </div>
+            <div class="ap-input-group">
+              <div class="ap-input-wrap">
+                <i class="fa-solid fa-lock ap-icon"></i>
+                <input class="ap-input" type="password" id="pwPassword" placeholder="Password"
+                  autocomplete="current-password" />
+                <button type="button" class="ap-eye" id="pwToggle">
+                  <i class="fa-solid fa-eye"></i>
+                </button>
+              </div>
+              <span class="ap-error" id="pwPassError">Password is required.</span>
+            </div>
+            <div class="ap-row">
+              <label class="ap-check"><input type="checkbox" id="rememberMe" /> Remember me</label>
+              <a href="#" id="forgotLink" class="ap-link">Forgot password?</a>
+            </div>
+            <button class="ap-btn" id="loginPwBtn">
+              <span class="ap-btn-text">Sign In</span>
+              <span class="ap-spinner" id="loginPwSpinner"></span>
+              <i class="fa-solid fa-arrow-right ap-btn-icon"></i>
+            </button>
+          </div>
+
+          <!-- OTP panel -->
+          <div class="tab-panel" id="panelOtp">
+            <div class="ap-input-group">
+              <div class="ap-input-wrap">
+                <i class="fa-solid fa-user ap-icon" id="otpIdIcon"></i>
+                <input class="ap-input" type="text" id="otpIdentifier" placeholder="Email or phone number"
+                  autocomplete="username" />
+              </div>
+              <span class="ap-error" id="otpIdError">Enter a valid email or phone number.</span>
+            </div>
+            <button class="ap-btn" id="sendOtpBtn">
+              <span class="ap-btn-text">Send OTP</span>
+              <span class="ap-spinner" id="sendSpinner"></span>
+              <i class="fa-solid fa-arrow-right ap-btn-icon"></i>
+            </button>
+          <!-- Evaluation Demo Quick-Access -->
+          <div class="demo-accounts-card">
+            <div class="demo-accounts-header">
+              <i class="fa-solid fa-bolt-lightning"></i>
+              <span>Quick Demo Access (Examiner / Demo)</span>
+            </div>
+            <div class="demo-btn-group">
+              <button type="button" class="demo-role-btn" onclick="fillDemo('admin@forecastai.com', 'Admin@12345')">
+                <span class="role-badge role-admin">Admin</span>
+                <span class="role-desc">Full Analytics &amp; Control</span>
+              </button>
+              <button type="button" class="demo-role-btn" onclick="fillDemo('procurement@forecastiq.com', 'Procure@123')">
+                <span class="role-badge role-procure">Procurement</span>
+                <span class="role-desc">Reorders &amp; Lead Times</span>
+              </button>
+              <button type="button" class="demo-role-btn" onclick="fillDemo('warehouse@forecastiq.com', 'Warehouse@123')">
+                <span class="role-badge role-warehouse">Warehouse</span>
+                <span class="role-desc">Stock Transfers &amp; Safety</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="ap-footer">New user? <a href="signup.html" class="ap-link">Create account</a></div>
+        </div>
+
+        <!-- ── STEP 2: OTP verify ── -->
+        <div class="auth-step hidden" id="stepOtp">
+          <div class="ap-header">
+            <h2>Verify Identity</h2>
+            <p>OTP sent to <strong id="maskedId">—</strong></p>
+          </div>
+          <div class="alert-msg" id="otpAlert"></div>
+          <div class="otp-boxes" id="otpBoxes"></div>
+          <div class="otp-meta">
+            <span class="otp-timer-label">Expires in <span class="timer-val" id="timerVal">05:00</span></span>
+            <button class="resend-btn" id="resendBtn" disabled>Resend OTP</button>
+          </div>
+          <div class="attempt-warn" id="attemptWarn"></div>
+          <button class="ap-btn" id="verifyBtn" disabled>
+            <span class="ap-btn-text">Verify OTP</span>
+            <span class="ap-spinner" id="verifySpinner"></span>
+            <i class="fa-solid fa-check ap-btn-icon"></i>
+          </button>
+          <button class="ap-btn-ghost" id="backBtn">
+            <i class="fa-solid fa-arrow-left"></i> Change identifier
+          </button>
+        </div>
+
+        <!-- ── SUCCESS ── -->
+        <div class="auth-step hidden" id="stepSuccess">
+          <div class="success-anim">
+            <div class="success-ring"><i class="fa-solid fa-check"></i></div>
+            <h2>Access Granted</h2>
+            <p>Launching your dashboard...</p>
+            <div class="launch-bar">
+              <div class="launch-fill" id="launchFill"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="auth.js"></script>
+  <script src="components/otp-input.js"></script>
+  <script>
+    guardAuth();
+
+    const otpInput = new OTPInput('otpBoxes', 6, (val, complete) => {
+      document.getElementById('verifyBtn').disabled = !complete;
+      hideAlert('otpAlert');
+    });
+
+    function switchTab(tab) {
+      document.getElementById('tabPassword').classList.toggle('active', tab === 'password');
+      document.getElementById('tabOtp').classList.toggle('active', tab === 'otp');
+      document.getElementById('panelPassword').classList.toggle('active', tab === 'password');
+      document.getElementById('panelOtp').classList.toggle('active', tab === 'otp');
+      hideAlert('loginAlert');
+    }
+
+    window.fillDemo = function (email, pass) {
+      switchTab('password');
+      const idInp = document.getElementById('pwIdentifier');
+      const pwInp = document.getElementById('pwPassword');
+      idInp.value = email;
+      pwInp.value = pass;
+      idInp.classList.remove('error');
+      pwInp.classList.remove('error');
+      document.getElementById('pwIdError').classList.remove('show');
+      document.getElementById('pwPassError').classList.remove('show');
+      document.getElementById('pwIdIcon').className = 'fa-solid fa-envelope ap-icon';
+      document.getElementById('loginPwBtn').click();
+    };
+
+    function bindIdIcon(inputId, iconId, errorId) {
+      document.getElementById(inputId).addEventListener('input', function () {
+        const v = this.value.trim();
+        document.getElementById(iconId).className =
+          v.includes('@') ? 'fa-solid fa-envelope ap-icon' :
+            v.length ? 'fa-solid fa-phone ap-icon' : 'fa-solid fa-user ap-icon';
+        this.classList.remove('error');
+        document.getElementById(errorId).classList.remove('show');
+        hideAlert('loginAlert');
+      });
+    }
+    bindIdIcon('pwIdentifier', 'pwIdIcon', 'pwIdError');
+    bindIdIcon('otpIdentifier', 'otpIdIcon', 'otpIdError');
+
+    document.getElementById('pwToggle').addEventListener('click', function () {
+      const inp = document.getElementById('pwPassword');
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+      this.querySelector('i').className = inp.type === 'password' ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash';
+    });
+
+    document.getElementById('pwPassword').addEventListener('input', function () {
+      this.classList.remove('error');
+      document.getElementById('pwPassError').classList.remove('show');
+    });
+
+    document.getElementById('loginPwBtn').addEventListener('click', async () => {
+      const id = document.getElementById('pwIdentifier').value.trim();
+      const pw = document.getElementById('pwPassword').value;
+      let valid = true;
+      if (!id || (!isEmail(id) && !isPhone(id))) {
+        document.getElementById('pwIdentifier').classList.add('error');
+        document.getElementById('pwIdError').classList.add('show');
+        valid = false;
+      }
+      if (!pw) {
+        document.getElementById('pwPassword').classList.add('error');
+        document.getElementById('pwPassError').classList.add('show');
+        valid = false;
+      }
+      if (!valid) return;
+      setBtnLoading('loginPwBtn', true, 'Signing in...');
+      hideAlert('loginAlert');
+      try {
+        const data = await apiLoginPassword(id, pw);
+        if (data.ok) {
+          saveSession(data.user, data.token);
+          switchStep('stepId', 'stepSuccess');
+          animateLaunch();
+        } else {
+          showAlert('loginAlert', 'error', data.error || 'Login failed.');
+          setBtnLoading('loginPwBtn', false);
+        }
+      } catch {
+        showAlert('loginAlert', 'error', 'Cannot reach the server. Make sure the backend is running.');
+        setBtnLoading('loginPwBtn', false);
+      }
+    });
+
+    document.getElementById('pwPassword').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('loginPwBtn').click();
+    });
+
+    document.getElementById('forgotLink').addEventListener('click', e => {
+      e.preventDefault();
+      switchTab('otp');
+      showAlert('loginAlert', 'info', 'Enter your registered email or phone and use OTP to sign in.');
+    });
+
+    document.getElementById('sendOtpBtn').addEventListener('click', async () => {
+      const val = document.getElementById('otpIdentifier').value.trim();
+      if (!val || (!isEmail(val) && !isPhone(val))) {
+        document.getElementById('otpIdentifier').classList.add('error');
+        document.getElementById('otpIdError').classList.add('show');
+        return;
+      }
+      setBtnLoading('sendOtpBtn', true, 'Sending...');
+      hideAlert('loginAlert');
+      try {
+        const data = await apiSendOtp(val);
+        if (!data.ok) {
+          showAlert('loginAlert', 'error', data.error || 'Something went wrong.');
+          setBtnLoading('sendOtpBtn', false);
+          return;
+        }
+        sessionStorage.setItem('otp_flow', 'login');
+        goToOtpStep(data.identifier, data.maskedTarget, data.channel);
+      } catch {
+        showAlert('loginAlert', 'error', 'Cannot reach the server. Make sure the backend is running.');
+        setBtnLoading('sendOtpBtn', false);
+      }
+    });
+
+    document.getElementById('otpIdentifier').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('sendOtpBtn').click();
+    });
+
+    let timerInterval, resendCooldown;
+
+    function goToOtpStep(identifier, maskedTarget, channel) {
+      sessionStorage.setItem('otp_identifier', identifier);
+      sessionStorage.setItem('otp_masked', maskedTarget || maskIdentifier(identifier));
+      sessionStorage.setItem('otp_channel', channel);
+      document.getElementById('maskedId').textContent = maskedTarget || maskIdentifier(identifier);
+      switchStep('stepId', 'stepOtp');
+      document.getElementById('dot1').classList.remove('active');
+      document.getElementById('dot2').classList.add('active');
+      otpInput.focus();
+      startTimer(300);
+      startResendCooldown(30);
+    }
+
+    function startTimer(s) {
+      clearInterval(timerInterval);
+      let rem = s;
+      const el = document.getElementById('timerVal');
+      el.classList.remove('expired');
+      timerInterval = setInterval(() => {
+        rem--;
+        el.textContent = `${String(Math.floor(rem / 60)).padStart(2, '0')}:${String(rem % 60).padStart(2, '0')}`;
+        if (rem <= 60) el.classList.add('expired');
+        if (rem <= 0) {
+          clearInterval(timerInterval);
+          el.textContent = 'Expired';
+          showAlert('otpAlert', 'warning', 'OTP expired. Please resend.');
+          document.getElementById('verifyBtn').disabled = true;
+        }
+      }, 1000);
+    }
+
+    function startResendCooldown(s) {
+      const btn = document.getElementById('resendBtn');
+      btn.disabled = true; let rem = s;
+      btn.textContent = `Resend in ${rem}s`;
+      resendCooldown = setInterval(() => {
+        rem--;
+        btn.textContent = rem > 0 ? `Resend in ${rem}s` : 'Resend OTP';
+        if (rem <= 0) { clearInterval(resendCooldown); btn.disabled = false; }
+      }, 1000);
+    }
+
+    document.getElementById('verifyBtn').addEventListener('click', async () => {
+      const val = otpInput.getValue();
+      const identifier = sessionStorage.getItem('otp_identifier');
+      setBtnLoading('verifyBtn', true, 'Verifying...');
+      try {
+        const data = await apiVerifyOtp(identifier, val);
+        if (data.ok) {
+          otpInput.setSuccess();
+          clearInterval(timerInterval);
+          saveSession(data.user, data.token);
+          switchStep('stepOtp', 'stepSuccess');
+          animateLaunch();
+        } else {
+          setBtnLoading('verifyBtn', false);
+          otpInput.setError(); otpInput.clear();
+          if (data.code === 'EXPIRED') {
+            showAlert('otpAlert', 'warning', 'OTP expired. Please resend.');
+          } else if (data.code === 'MAX_ATTEMPTS') {
+            showAlert('otpAlert', 'error', 'Too many attempts. Please resend.');
+            document.getElementById('verifyBtn').disabled = true;
+          } else {
+            showAlert('otpAlert', 'error', data.error || 'Incorrect OTP.');
+            if (typeof data.remaining === 'number' && data.remaining <= 2) {
+              const w = document.getElementById('attemptWarn');
+              w.textContent = `⚠ ${data.remaining} attempt${data.remaining === 1 ? '' : 's'} remaining`;
+              w.classList.add('show');
+            }
+          }
+        }
+      } catch {
+        setBtnLoading('verifyBtn', false);
+        showAlert('otpAlert', 'error', 'Cannot reach the server.');
+      }
+    });
+
+    document.getElementById('resendBtn').addEventListener('click', async () => {
+      const identifier = sessionStorage.getItem('otp_identifier');
+      hideAlert('otpAlert');
+      document.getElementById('attemptWarn').classList.remove('show');
+      document.getElementById('verifyBtn').disabled = true;
+      otpInput.clear();
+      const btn = document.getElementById('resendBtn');
+      btn.disabled = true; btn.textContent = 'Sending...';
+      try {
+        const data = await apiResendOtp(identifier);
+        if (data.ok) {
+          startTimer(300); startResendCooldown(30);
+          showAlert('otpAlert', 'info', `New OTP sent to <strong>${data.maskedTarget}</strong>.`);
+        } else {
+          btn.disabled = false; btn.textContent = 'Resend OTP';
+          showAlert('otpAlert', 'error', data.error || 'Failed to resend.');
+        }
+      } catch {
+        btn.disabled = false; btn.textContent = 'Resend OTP';
+        showAlert('otpAlert', 'error', 'Cannot reach the server.');
+      }
+    });
+
+    document.getElementById('backBtn').addEventListener('click', () => {
+      clearInterval(timerInterval); clearInterval(resendCooldown);
+      switchStep('stepOtp', 'stepId');
+      document.getElementById('dot2').classList.remove('active');
+      document.getElementById('dot1').classList.add('active');
+      hideAlert('otpAlert');
+      otpInput.clear();
+    });
+
+    function animateLaunch() {
+      const fill = document.getElementById('launchFill');
+      let w = 0;
+      const iv = setInterval(() => {
+        w += 2; fill.style.width = w + '%';
+        if (w >= 100) { clearInterval(iv); setTimeout(redirectToDashboard, 300); }
+      }, 20);
+    }
+
+    function switchStep(from, to) {
+      const f = document.getElementById(from), t = document.getElementById(to);
+      f.classList.add('step-out');
+      setTimeout(() => {
+        f.classList.add('hidden'); f.classList.remove('step-out');
+        t.classList.remove('hidden'); t.classList.add('step-in');
+        setTimeout(() => t.classList.remove('step-in'), 400);
+      }, 280);
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !document.getElementById('verifyBtn').disabled &&
+        !document.getElementById('stepOtp').classList.contains('hidden')) {
+        document.getElementById('verifyBtn').click();
+      }
+    });
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,11 @@
+% Surgical PDF-to-LaTeX wrapper
+% The source preserves the uploaded six-page IEEE layout exactly by
+% including the surgically edited page set as the page artwork.
+% Compile with pdfLaTeX.
+\documentclass[letterpaper]{article}
+\usepackage{pdfpages}
+\usepackage[paperwidth=612pt,paperheight=792pt,margin=0pt]{geometry}
+\pagestyle{empty}
+\begin{document}
+\includepdf[pages=-,fitpaper=true,pagecommand={}]{Research_Paper_Final(6)_references_updated.pdf}
+\end{document}
