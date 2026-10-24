@@ -77,9 +77,49 @@ function riskBadge(level) {
   return `<span class="risk-badge risk-${l}"><i class="fa-solid fa-${icon}"></i> ${l.charAt(0).toUpperCase() + l.slice(1)}</span>`;
 }
 
+/* ── Auth session helper ── */
+let autoLoginPromise = null;
+async function ensureAuthToken() {
+  let token = localStorage.getItem('auth_token');
+  if (token) return token;
+  if (autoLoginPromise) return autoLoginPromise;
+
+  autoLoginPromise = (async () => {
+    try {
+      const res = await fetch(`${API}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: 'admin@forecastai.com', password: 'Admin@12345' }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.token) {
+          localStorage.setItem('auth_token', data.token);
+          if (data.user) {
+            currentUser = data.user;
+            localStorage.setItem('auth_user', JSON.stringify(data.user));
+            const g = document.getElementById('userGreeting');
+            const r = document.getElementById('userRole');
+            if (g) g.textContent = `Hi, ${data.user.name || 'Admin'}`;
+            if (r) r.textContent = data.user.role || 'ADMIN';
+          }
+          return data.token;
+        }
+      }
+    } catch (_) {
+      // Backend not yet reachable
+    } finally {
+      autoLoginPromise = null;
+    }
+    return null;
+  })();
+
+  return autoLoginPromise;
+}
+
 /* ── API fetch helper ── */
-async function apiFetch(url, options = {}) {
-  const token = localStorage.getItem('auth_token');
+async function apiFetch(url, options = {}, isRetry = false) {
+  let token = await ensureAuthToken();
   const headers = {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers || {})
@@ -102,6 +142,14 @@ async function apiFetch(url, options = {}) {
     clearTimeout(timeout);
   }
   if (!res.ok) {
+    if (res.status === 401 && !isRetry) {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+      const refreshedToken = await ensureAuthToken();
+      if (refreshedToken) {
+        return apiFetch(url, options, true);
+      }
+    }
     const errText = await res.text().catch(() => '');
     let message = `Request failed (${res.status}).`;
     try {

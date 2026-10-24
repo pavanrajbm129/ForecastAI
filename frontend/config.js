@@ -23,7 +23,7 @@
     const host = (root.location && root.location.hostname) || '';
     const localDevelopment = isLocalHost(host);
 
-    if (host === 'forecastai-frontend.vercel.app') {
+    if (host.endsWith('.vercel.app') || host.endsWith('.web.app') || host.endsWith('.firebaseapp.com')) {
       try {
         root.localStorage && root.localStorage.removeItem('forecastai_api_url');
       } catch (_) {}

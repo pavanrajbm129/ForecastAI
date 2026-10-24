@@ -50,10 +50,19 @@ if (process.env.FRONTEND_URL) {
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-    const lower = origin.toLowerCase();
+    const lower = origin.toLowerCase().replace(/\/+$/, '');
     if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(lower)) return callback(null, true);
     if (process.env.NODE_ENV !== 'production' && origin === 'null') return callback(null, true);
+    // Allow all Vercel preview & production deployments (*.vercel.app)
+    if (/^https:\/\/[a-z0-9\-_.]+\.vercel\.app$/.test(lower)) return callback(null, true);
+    // Allow Firebase Hosting domains (*.web.app, *.firebaseapp.com)
+    if (/^https:\/\/[a-z0-9\-]+\.(web\.app|firebaseapp\.com)$/.test(lower)) return callback(null, true);
     if (allowedOriginsConfig.has(lower)) return callback(null, true);
+    for (const allowed of allowedOriginsConfig) {
+      if (lower === allowed || lower.endsWith('.' + allowed.replace(/^https?:\/\//, ''))) {
+        return callback(null, true);
+      }
+    }
     callback(new Error(`CORS blocked: ${origin}`));
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
