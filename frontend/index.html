@@ -182,23 +182,7 @@
             <i class="fa-solid fa-bell"></i>
             <span class="notif-dot"></span>
           </button>
-          <div style="position:relative">
-            <div class="user-avatar" id="userAvatarBtn"><i class="fa-solid fa-user"></i></div>
-            <div id="userDropdown"
-              style="display:none;position:absolute;right:0;top:44px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.12);min-width:200px;z-index:300;overflow:hidden">
-              <div style="padding:13px 16px;border-bottom:1px solid #f3f4f6">
-                <div style="font-weight:700;color:#111827;font-size:0.84rem;margin-bottom:2px" id="userGreeting">Welcome
-                </div>
-                <div style="color:#6b7280;font-size:0.72rem" id="userIdentifier"></div>
-                <div style="color:#3E92CC;font-size:0.68rem;font-weight:700;margin-top:5px" id="userRole"></div>
-              </div>
-              <button onclick="logoutUser()"
-                style="width:100%;padding:11px 16px;text-align:left;font-size:0.81rem;color:#dc2626;display:flex;align-items:center;gap:8px;background:none;border:none;cursor:pointer;font-family:inherit"
-                onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='none'">
-                <i class="fa-solid fa-right-from-bracket"></i> Sign Out
-              </button>
-            </div>
-          </div>
+          <div class="user-avatar" aria-label="ForecastAI dashboard"><i class="fa-solid fa-chart-line"></i></div>
         </div>
       </header>
 
@@ -1213,7 +1197,7 @@
             <div class="glass-card settings-card">
               <h3 class="ctrl-title"><i class="fa-solid fa-plug"></i> API Configuration</h3>
               <div class="form-group"><label>Backend URL</label><input type="text" class="glass-input"
-                  value="http://localhost:4000" id="settingsApiUrl" /></div>
+                  value="https://forecastai-87fx.onrender.com" id="settingsApiUrl" /></div>
               <button class="glass-btn" style="margin-top:8px" onclick="testApiConnection()"><i
                   class="fa-solid fa-plug"></i> Test Connection</button>
             </div>
@@ -1429,8 +1413,8 @@
     </div>
   </div>
 
-  <script src="config.js"></script>
-  <script src="script.js?v=20260824-status4"></script>
+  <script src="config.js?v=20261024-direct-access"></script>
+  <script src="script.js?v=20261024-direct-access"></script>
 
   <script>
     /* Particles */

@@ -2,17 +2,9 @@
    ForecastAI Enterprise — script.js v3.0
    All data from real backend APIs. No hardcoded product arrays.
    ================================================================ */
-const API = (window.__FORECASTAI_CONFIG__ && window.__FORECASTAI_CONFIG__.apiBase) ||
-  ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? 'http://localhost:4000/api'
-    : '/api');
+const API = window.__FORECASTAI_CONFIG__.apiBase;
 
-const ROLE_PAGES = {
-  ADMIN: ['dashboard', 'intelligence-center', 'forecast', 'upload', 'analytics', 'alerts', 'ml', 'reports', 'settings', 'scenario-lab', 'copilot', 'action-center', 'model-lab', 'audit', 'data-quality', 'user-management', 'procurement', 'purchase-requests', 'purchase-orders', 'suppliers', 'deliveries', 'inventory-transactions'],
-  MANAGER: ['dashboard', 'intelligence-center', 'forecast', 'upload', 'analytics', 'alerts', 'ml', 'reports', 'scenario-lab', 'copilot', 'action-center', 'audit', 'data-quality', 'procurement', 'purchase-requests', 'purchase-orders', 'suppliers', 'deliveries', 'inventory-transactions'],
-  PROCUREMENT: ['procurement', 'purchase-requests', 'purchase-orders', 'suppliers', 'deliveries'],
-  WAREHOUSE: ['warehouse', 'deliveries', 'inventory-transactions'],
-};
+let currentUser = null;
 
 /* ── Chart registry ── */
 const charts = {};
@@ -95,28 +87,37 @@ async function apiFetch(url, options = {}) {
   if (!(options.body instanceof FormData) && !headers['Content-Type']) {
     headers['Content-Type'] = 'application/json';
   }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), options.timeoutMs || 90000);
+  const { timeoutMs, ...fetchOptions } = options;
   let res;
   try {
-    res = await fetch(url, { ...options, headers });
-  } catch (_) {
-    throw new Error('Unable to connect to the reporting service.');
+    res = await fetch(url, { ...fetchOptions, headers, signal: options.signal || controller.signal });
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error('The backend took too long to respond. Render may be starting up; wait a moment and retry.');
+    }
+    throw new Error(`Unable to connect to the ForecastAI backend. Check your connection and try again. (${error.message})`);
+  } finally {
+    clearTimeout(timeout);
   }
   if (!res.ok) {
-    if (res.status === 401 && !url.endsWith('/health')) {
-      localStorage.removeItem('auth_user');
-      localStorage.removeItem('auth_token');
-      window.location.href = 'auth/login.html';
-    }
-    const errText = await res.text().catch(() => 'Unknown error');
+    const errText = await res.text().catch(() => '');
     let message = `Request failed (${res.status}).`;
     try {
       const payload = JSON.parse(errText);
       message = typeof payload.error === 'string' ? payload.error : payload.error?.message || message;
     } catch (_) { }
-    if (res.status === 401) message = 'Your session has expired.';
+    if (res.status === 401 || res.status === 403) {
+      message = `${message} This backend endpoint requires an authorized account; direct dashboard access does not bypass backend authentication.`;
+    }
     throw new Error(message);
   }
-  return res.json();
+  try {
+    return await res.json();
+  } catch (_) {
+    throw new Error(`The backend returned an invalid response (${res.status}).`);
+  }
 }
 
 /* ── Uploaded CSV state ── */
@@ -141,11 +142,6 @@ const PAGE_TITLES = {
 let pendingSearchProduct = null;
 
 function navigateTo(page) {
-  const allowed = ROLE_PAGES[currentUser?.role] || [];
-  if (!allowed.includes(page)) {
-    showToast('You do not have access to this page.');
-    page = 'dashboard';
-  }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const pageEl = document.getElementById(`page-${page}`);
@@ -173,26 +169,18 @@ function navigateTo(page) {
 }
 
 function applyRoleNavigation() {
-  const allowed = ROLE_PAGES[currentUser?.role] || [];
   document.querySelectorAll('.nav-item').forEach(item => {
-    item.style.display = allowed.includes(item.dataset.page) ? '' : 'none';
+    item.style.display = '';
   });
   document.querySelectorAll('.nav-section-label').forEach(label => {
-    let next = label.nextElementSibling;
-    let visible = false;
-    while (next && !next.classList.contains('nav-section-label')) {
-      if (next.classList.contains('nav-item') && next.style.display !== 'none') visible = true;
-      next = next.nextElementSibling;
-    }
-    label.style.display = visible ? '' : 'none';
+    label.style.display = '';
   });
 }
 
 async function loadCurrentUser() {
   const token = localStorage.getItem('auth_token');
   if (!token) {
-    window.location.href = 'auth/login.html';
-    return false;
+    return true;
   }
   try {
     const controller = new AbortController();
@@ -209,8 +197,7 @@ async function loadCurrentUser() {
     if (res.status === 401) {
       localStorage.removeItem('auth_user');
       localStorage.removeItem('auth_token');
-      window.location.href = 'auth/login.html';
-      return false;
+      return true;
     }
     if (!res.ok) throw new Error(`Authentication failed (${res.status})`);
     const data = await res.json();
@@ -231,7 +218,7 @@ async function loadCurrentUser() {
       showToast('Cannot reach the authentication service — check the backend connection');
     }
     document.body.setAttribute('data-auth-state', 'error');
-    return false;
+    return true;
   }
 }
 
@@ -3405,23 +3392,20 @@ function navigateSearchResult(result) {
   }
 }
 
-/* ================================================================
-   AUTH
-   ================================================================ */
-function logoutUser() {
-  localStorage.removeItem('auth_user');
-  localStorage.removeItem('auth_token');
-  window.location.href = 'auth/login.html';
-}
-
 async function testApiConnection() {
   const input = document.getElementById('settingsApiUrl');
   let targetUrl = (input && input.value.trim()) || API;
   try {
-    let cleanBase = targetUrl.replace(/\/+$/, '');
-    if (!cleanBase.endsWith('/api')) cleanBase += '/api';
+    let cleanBase = targetUrl.replace(/\/+$/, '').replace(/(?:\/api)+$/i, '') + '/api';
     const healthUrl = cleanBase + '/health';
-    const res = await fetch(healthUrl);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 90000);
+    let res;
+    try {
+      res = await fetch(healthUrl, { signal: controller.signal });
+    } finally {
+      clearTimeout(timeout);
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     if (window.__FORECASTAI_CONFIG__) {
@@ -3445,31 +3429,12 @@ document.addEventListener('DOMContentLoaded', () => {
   if (apiInput) {
     const currentBase = (window.__FORECASTAI_CONFIG__ && window.__FORECASTAI_CONFIG__.apiBase) || API;
     apiInput.value = currentBase.replace(/\/api$/, '') || currentBase;
+    apiInput.readOnly = window.location.hostname === 'forecastai-frontend.vercel.app';
   }
 
   /* Restore dark mode */
   if (localStorage.getItem('darkMode') === '1') setDarkMode(true);
 
-
-  /* User greeting */
-  try {
-    const user = JSON.parse(localStorage.getItem('auth_user'));
-    if (user) {
-      const g = document.getElementById('userGreeting');
-      const e = document.getElementById('userIdentifier');
-      if (g) g.textContent = user.firstName ? `Hi, ${user.firstName}` : 'Welcome';
-      if (e) e.textContent = user.email || user.phone || '';
-    }
-  } catch (_) { }
-
-  /* Avatar dropdown */
-  const avatarBtn = document.getElementById('userAvatarBtn');
-  const dropdown = document.getElementById('userDropdown');
-  avatarBtn?.addEventListener('click', ev => {
-    ev.stopPropagation();
-    if (dropdown) dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
-  });
-  document.addEventListener('click', () => { if (dropdown) dropdown.style.display = 'none'; });
 
   /* Navigation */
   document.querySelectorAll('.nav-item').forEach(item => {
@@ -3773,10 +3738,6 @@ document.addEventListener('DOMContentLoaded', () => {
   /* Global search */
   initGlobalSearch();
 
-  /* Boot dashboard after validating the session and applying its role. */
-  loadCurrentUser().then(valid => {
-    if (!valid) return;
-    const rolePage = currentUser.role === 'PROCUREMENT' ? 'procurement' : currentUser.role === 'WAREHOUSE' ? 'warehouse' : 'dashboard';
-    navigateTo(rolePage);
-  });
+  /* Open the dashboard directly; backend APIs retain their own authorization checks. */
+  navigateTo('dashboard');
 });

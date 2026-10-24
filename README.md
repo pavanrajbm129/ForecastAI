@@ -160,6 +160,22 @@ The frontend is available at:
 http://localhost:3000/auth/login.html
 ```
 
+## Production API Configuration
+
+The frontend is plain HTML, CSS, and JavaScript; it does not require a Vite build or Vite environment variables. Its shared configuration is in `frontend/config.js`:
+
+- Localhost development uses `http://localhost:4000/api`.
+- The deployed Vercel frontend uses `https://forecastai-87fx.onrender.com/api`.
+
+Configure the Render service with the deployed frontend origin so browser API requests pass CORS checks:
+
+```env
+FRONTEND_URL=https://forecastai-frontend.vercel.app
+ALLOWED_ORIGINS=https://forecastai-frontend.vercel.app
+```
+
+Additional deployed frontend origins can be included as comma-separated exact origins in `ALLOWED_ORIGINS`. Redeploy the backend after changing its CORS configuration.
+
 ## Demo Accounts
 
 The project includes a seeded admin account for local testing.

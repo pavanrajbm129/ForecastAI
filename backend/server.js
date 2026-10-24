@@ -30,30 +30,30 @@ const PORT = process.env.PORT || 4000;
 const HOST = '0.0.0.0';
 
 /* ── CORS ─────────────────────────────────────────────────────────────────── */
-const allowedOriginsConfig = (process.env.ALLOWED_ORIGINS || '')
+const DEFAULT_ALLOWED_ORIGINS = [
+  'https://forecastai-frontend.vercel.app',
+  'https://forecastai-prod.web.app',
+  'https://forecastai-prod.firebaseapp.com',
+];
+const allowedOriginsConfig = new Set([
+  ...DEFAULT_ALLOWED_ORIGINS,
+  ...(process.env.ALLOWED_ORIGINS || '')
   .split(',')
   .map(s => s.trim().toLowerCase())
-  .filter(Boolean);
+  .filter(Boolean),
+]);
 
 if (process.env.FRONTEND_URL) {
-  allowedOriginsConfig.push(process.env.FRONTEND_URL.trim().toLowerCase());
+  allowedOriginsConfig.add(process.env.FRONTEND_URL.trim().toLowerCase());
 }
 
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
     const lower = origin.toLowerCase();
-    // Allow local development
     if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(lower)) return callback(null, true);
-    if (origin === 'null') return callback(null, true);
-    // Allow explicitly configured origins
-    if (allowedOriginsConfig.some(allowed => lower === allowed || lower.startsWith(allowed))) {
-      return callback(null, true);
-    }
-    // Allow standard Firebase Hosting domains
-    if (/^https:\/\/[a-z0-9\-]+\.(web\.app|firebaseapp\.com)$/.test(lower)) {
-      return callback(null, true);
-    }
+    if (process.env.NODE_ENV !== 'production' && origin === 'null') return callback(null, true);
+    if (allowedOriginsConfig.has(lower)) return callback(null, true);
     callback(new Error(`CORS blocked: ${origin}`));
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -381,4 +381,3 @@ app.listen(PORT, HOST, () => {
   console.log(`   Models:       GET  http://${HOST}:${PORT}/api/models`);
   console.log(`   Copilot:      POST http://${HOST}:${PORT}/api/intelligence/copilot\n`);
 });
-

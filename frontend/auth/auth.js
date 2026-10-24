@@ -1,26 +1,46 @@
 /* ===== AUTH.JS — frontend auth client (talks to real backend) ===== */
 
-const API = (window.__FORECASTAI_CONFIG__ && window.__FORECASTAI_CONFIG__.authBase) ||
-  ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? 'http://localhost:4000/api/auth'
-    : '/api/auth');
+const API = window.__FORECASTAI_CONFIG__.authBase;
 
 
 /* ================================================================
    API CALLS
    ================================================================ */
 
+async function authApiRequest(path, body, headers = {}) {
+  let response;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 90000);
+  try {
+    response = await fetch(`${API}/${path}`, {
+      method: body === undefined ? 'GET' : 'POST',
+      headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...headers },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    const message = error.name === 'AbortError'
+      ? 'The server took too long to respond. Render may be starting up; wait a moment and retry.'
+      : `Unable to reach the ForecastAI backend. Check your connection and try again. (${error.message})`;
+    return { ok: false, status: 0, error: message };
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  try {
+    const data = await response.json();
+    return { ok: response.ok, status: response.status, ...data };
+  } catch (_) {
+    return { ok: false, status: response.status, error: `The server returned an invalid response (${response.status}).` };
+  }
+}
+
 /**
  * POST /api/auth/signup
  * Registers user + sends OTP to phone (preferred) or email.
  */
 async function apiSignup({ firstName, lastName, email, phone, password }) {
-  const res = await fetch(`${API}/signup`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ firstName, lastName, email, phone, password }),
-  });
-  return res.json().then(data => ({ ok: res.ok, status: res.status, ...data }));
+  return authApiRequest('signup', { firstName, lastName, email, phone, password });
 }
 
 /**
@@ -28,12 +48,7 @@ async function apiSignup({ firstName, lastName, email, phone, password }) {
  * Password-based login.
  */
 async function apiLoginPassword(identifier, password) {
-  const res = await fetch(`${API}/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ identifier, password }),
-  });
-  return res.json().then(data => ({ ok: res.ok, status: res.status, ...data }));
+  return authApiRequest('login', { identifier, password });
 }
 
 /**
@@ -41,36 +56,21 @@ async function apiLoginPassword(identifier, password) {
  * Verifies identifier exists, sends OTP to registered phone/email.
  */
 async function apiSendOtp(identifier) {
-  const res = await fetch(`${API}/send-otp`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ identifier }),
-  });
-  return res.json().then(data => ({ ok: res.ok, status: res.status, ...data }));
+  return authApiRequest('send-otp', { identifier });
 }
 
 /**
  * POST /api/auth/verify-otp
  */
 async function apiVerifyOtp(identifier, otp) {
-  const res = await fetch(`${API}/verify-otp`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ identifier, otp }),
-  });
-  return res.json().then(data => ({ ok: res.ok, status: res.status, ...data }));
+  return authApiRequest('verify-otp', { identifier, otp });
 }
 
 /**
  * POST /api/auth/resend-otp
  */
 async function apiResendOtp(identifier) {
-  const res = await fetch(`${API}/resend-otp`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ identifier }),
-  });
-  return res.json().then(data => ({ ok: res.ok, status: res.status, ...data }));
+  return authApiRequest('resend-otp', { identifier });
 }
 
 /* ================================================================
@@ -98,8 +98,6 @@ function redirectToOTP(identifier, maskedTarget, channel) {
   sessionStorage.setItem('otp_channel', channel || (isEmail(identifier) ? 'email' : 'phone'));
   window.location.href = 'otp-verification.html';
 }
-function redirectToLogin() { window.location.href = 'login.html'; }
-
 async function guardAuth() {
   setAuthState('loading');
   const user = getSession();
@@ -122,11 +120,26 @@ async function guardAuth() {
       return;
     }
 
-    clearSession();
-    setAuthState('unauthenticated');
-  } catch {
-    clearSession();
-    setAuthState('unauthenticated');
+    if (res.status === 401) {
+      clearSession();
+      setAuthState('unauthenticated');
+      return;
+    }
+    setAuthState('error');
+    const alert = document.getElementById('loginAlert') || document.getElementById('signupAlert');
+    if (alert) {
+      alert.textContent = `Unable to verify your session (${res.status}). Please try again.`;
+      alert.className = 'alert alert-error show';
+    }
+  } catch (error) {
+    setAuthState('error');
+    const alert = document.getElementById('loginAlert') || document.getElementById('signupAlert');
+    if (alert) {
+      alert.textContent = error.name === 'AbortError' || error.name === 'TimeoutError'
+        ? 'The server took too long to respond. Render may be starting up; wait a moment and retry.'
+        : 'Unable to reach the ForecastAI backend. Check your connection and try again.';
+      alert.className = 'alert alert-error show';
+    }
   }
 }
 

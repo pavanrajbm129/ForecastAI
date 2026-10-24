@@ -1,43 +1,54 @@
 /**
  * config.js — Centralized API and Environment Configuration for ForecastAI
  * ==========================================================================
- * Automatically resolves the correct Backend API endpoint:
- * 1. Checks user override in localStorage ('forecastai_api_url')
- * 2. Checks global window.__API_BASE__ (configured during deployment/hosting)
- * 3. In local development (localhost / 127.0.0.1): uses 'http://localhost:4000/api'
- * 4. In production (Firebase Hosting / Cloud Run):
- *    - Uses same-origin '/api' (when using Firebase Hosting rewrites to Cloud Run)
- *    - Or explicit Cloud Run endpoint URL
+ * Local development uses localhost:4000; deployed frontends use the Render API.
  */
 (function (root) {
   'use strict';
 
+  const PRODUCTION_API_ORIGIN = 'https://forecastai-87fx.onrender.com';
+  const LOCAL_API_ORIGIN = 'http://localhost:4000';
+
+  function normalizeApiBase(value) {
+    const url = String(value || '').trim().replace(/\/+$/, '');
+    if (!url) return '';
+    return url.replace(/(?:\/api)+$/i, '') + '/api';
+  }
+
+  function isLocalHost(host) {
+    return host === 'localhost' || host === '127.0.0.1' || host === '';
+  }
+
   function determineApiBase() {
-    // 1. User/Admin explicit setting saved in browser localStorage
+    const host = (root.location && root.location.hostname) || '';
+    const localDevelopment = isLocalHost(host);
+
+    if (host === 'forecastai-frontend.vercel.app') {
+      try {
+        root.localStorage && root.localStorage.removeItem('forecastai_api_url');
+      } catch (_) {}
+      return normalizeApiBase(PRODUCTION_API_ORIGIN);
+    }
+
+    // Runtime config is useful for deployments that inject their own API origin.
+    if (root.__API_BASE__ && typeof root.__API_BASE__ === 'string' && root.__API_BASE__.trim()) {
+      const configured = normalizeApiBase(root.__API_BASE__);
+      if (localDevelopment || configured.startsWith('https://')) return configured;
+    }
+
+    // Keep localhost overrides local to development and allow secure remote
+    // overrides on other hosts; discard stale localhost values in production.
     try {
       const saved = root.localStorage && root.localStorage.getItem('forecastai_api_url');
       if (saved && saved.trim()) {
-        let url = saved.trim().replace(/\/+$/, '');
-        if (!url.endsWith('/api')) url += '/api';
-        return url;
+        const configured = normalizeApiBase(saved);
+        if (localDevelopment) return configured;
+        if (configured.startsWith('https://')) return configured;
+        root.localStorage.removeItem('forecastai_api_url');
       }
     } catch (_) {}
 
-    // 2. Pre-injected runtime config
-    if (root.__API_BASE__ && typeof root.__API_BASE__ === 'string' && root.__API_BASE__.trim()) {
-      let url = root.__API_BASE__.trim().replace(/\/+$/, '');
-      if (!url.endsWith('/api')) url += '/api';
-      return url;
-    }
-
-    // 3. Localhost development
-    const host = (root.location && root.location.hostname) || '';
-    if (host === 'localhost' || host === '127.0.0.1' || host === '') {
-      return 'http://localhost:4000/api';
-    }
-
-    // 4. Production Firebase Hosting (relative /api with Cloud Run rewrite)
-    return '/api';
+    return normalizeApiBase(localDevelopment ? LOCAL_API_ORIGIN : PRODUCTION_API_ORIGIN);
   }
 
   const apiBase = determineApiBase();
