@@ -27,13 +27,13 @@
       "last_name": "",
       "email": "procurement@forecastiq.com",
       "phone": null,
-      "passwordHash": "$2a$12$PHOPP5FlxdkCLX2Bi2cNN.w1WpqeW8rSKlFEYF6E97hAGAlTZI4YK",
-      "password": "$2a$12$PHOPP5FlxdkCLX2Bi2cNN.w1WpqeW8rSKlFEYF6E97hAGAlTZI4YK",
+      "passwordHash": "$2a$12$r94v1a3yoEf7jUbmpNZhuuWz7yv0PRVecKzGg7seXgoSZVOiZB24W",
+      "password": "$2a$12$r94v1a3yoEf7jUbmpNZhuuWz7yv0PRVecKzGg7seXgoSZVOiZB24W",
       "role": "PROCUREMENT",
       "status": "ACTIVE",
       "verified": true,
       "createdAt": "2026-08-23T18:38:18.262Z",
-      "updatedAt": "2026-08-23T18:38:26.325Z",
+      "updatedAt": "2026-10-24T07:07:18.393Z",
       "created_at": "2026-08-23T18:38:18.262Z"
     },
     {
@@ -43,13 +43,13 @@
       "last_name": "",
       "email": "warehouse@forecastiq.com",
       "phone": null,
-      "passwordHash": "$2a$12$BzJJRGrH.RsllZPj4biOrOctQkW2WPzcl5D5MhVYUq9wILO1Wu.JC",
-      "password": "$2a$12$BzJJRGrH.RsllZPj4biOrOctQkW2WPzcl5D5MhVYUq9wILO1Wu.JC",
+      "passwordHash": "$2a$12$2.M8ZeBAdJ9a1GQyrKSA6eKMS34NRS2RiZbS72jjhLlAaxx2Gi7/S",
+      "password": "$2a$12$2.M8ZeBAdJ9a1GQyrKSA6eKMS34NRS2RiZbS72jjhLlAaxx2Gi7/S",
       "role": "WAREHOUSE",
       "status": "ACTIVE",
       "verified": true,
       "createdAt": "2026-08-23T18:38:18.706Z",
-      "updatedAt": "2026-08-23T18:38:26.774Z",
+      "updatedAt": "2026-10-24T07:07:18.828Z",
       "created_at": "2026-08-23T18:38:18.706Z"
     },
     {
@@ -123335,11 +123335,11 @@
       "productId": "smart-watch-s3",
       "createdAt": "2026-10-23T13:52:14.642Z",
       "status": "APPROVED",
-      "recommendation": "Reorder 4500 units",
+      "recommendation": "REORDER_NOW — 4500 units",
       "userId": "5e9b5955-e1c9-421c-8a72-9ff69f89f019",
-      "reason": "Stock critically low",
-      "timestamp": "2026-10-23T17:09:40.542Z",
-      "updatedAt": "2026-10-23T17:09:40.542Z"
+      "reason": "Stock critically low, lead time 10 days",
+      "timestamp": "2026-10-24T04:44:42.961Z",
+      "updatedAt": "2026-10-24T04:44:42.961Z"
     },
     {
       "actionId": "laptop-pro-x1:HOLD",
@@ -123349,8 +123349,8 @@
       "recommendation": "HOLD",
       "userId": "5e9b5955-e1c9-421c-8a72-9ff69f89f019",
       "reason": "Demand declining",
-      "timestamp": "2026-10-23T17:02:49.081Z",
-      "updatedAt": "2026-10-23T17:02:49.081Z"
+      "timestamp": "2026-10-24T04:44:43.479Z",
+      "updatedAt": "2026-10-24T04:44:43.479Z"
     },
     {
       "actionId": "gaming-mouse:MONITOR",
@@ -123360,8 +123360,8 @@
       "recommendation": "MONITOR",
       "userId": "5e9b5955-e1c9-421c-8a72-9ff69f89f019",
       "reason": "Will review next week",
-      "timestamp": "2026-10-23T17:02:49.333Z",
-      "updatedAt": "2026-10-23T17:02:49.333Z"
+      "timestamp": "2026-10-24T04:44:43.748Z",
+      "updatedAt": "2026-10-24T04:44:43.748Z"
     }
   ],
   "suppliers": [

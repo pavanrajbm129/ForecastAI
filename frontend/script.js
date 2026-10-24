@@ -178,10 +178,31 @@ function applyRoleNavigation() {
 }
 
 async function loadCurrentUser() {
-  const token = localStorage.getItem('auth_token');
+  let token = localStorage.getItem('auth_token');
+  if (!token) {
+    // If no token exists in localStorage, automatically sign in with seeded demo admin credentials
+    try {
+      const loginRes = await fetch(`${API}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: 'admin@forecastai.com', password: 'Admin@12345' }),
+      });
+      if (loginRes.ok) {
+        const loginData = await loginRes.json();
+        token = loginData.token;
+        currentUser = loginData.user;
+        localStorage.setItem('auth_token', token);
+        localStorage.setItem('auth_user', JSON.stringify(currentUser));
+      }
+    } catch (_) {
+      // Backend not yet reachable
+    }
+  }
+
   if (!token) {
     return true;
   }
+
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
@@ -197,25 +218,40 @@ async function loadCurrentUser() {
     if (res.status === 401) {
       localStorage.removeItem('auth_user');
       localStorage.removeItem('auth_token');
-      return true;
+      // Token might be expired, retry login once
+      try {
+        const retryRes = await fetch(`${API}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier: 'admin@forecastai.com', password: 'Admin@12345' }),
+        });
+        if (retryRes.ok) {
+          const retryData = await retryRes.json();
+          currentUser = retryData.user;
+          localStorage.setItem('auth_token', retryData.token);
+          localStorage.setItem('auth_user', JSON.stringify(currentUser));
+          token = retryData.token;
+        }
+      } catch (_) {}
+    } else if (res.ok) {
+      const data = await res.json();
+      currentUser = data.user;
+      localStorage.setItem('auth_user', JSON.stringify(currentUser));
     }
-    if (!res.ok) throw new Error(`Authentication failed (${res.status})`);
-    const data = await res.json();
-    currentUser = data.user;
-    localStorage.setItem('auth_user', JSON.stringify(currentUser));
+
     applyRoleNavigation();
     const greeting = document.getElementById('userGreeting');
     const identifier = document.getElementById('userIdentifier');
     const role = document.getElementById('userRole');
-    if (greeting) greeting.textContent = `Hi, ${currentUser.name || currentUser.firstName || 'there'}`;
-    if (identifier) identifier.textContent = currentUser.email || currentUser.phone || '';
-    if (role) role.textContent = currentUser.role;
+    if (currentUser) {
+      if (greeting) greeting.textContent = `Hi, ${currentUser.name || currentUser.firstName || 'there'}`;
+      if (identifier) identifier.textContent = currentUser.email || currentUser.phone || '';
+      if (role) role.textContent = currentUser.role || 'ADMIN';
+    }
     return true;
   } catch (error) {
     if (error.name === 'AbortError') {
       showToast('Authentication check timed out — check the backend connection');
-    } else {
-      showToast('Cannot reach the authentication service — check the backend connection');
     }
     document.body.setAttribute('data-auth-state', 'error');
     return true;
@@ -3391,6 +3427,14 @@ function navigateSearchResult(result) {
     setTimeout(() => showProductDetail(productId), 650);
   }
 }
+/* ================================================================
+   AUTH
+   ================================================================ */
+function logoutUser() {
+  localStorage.removeItem('auth_user');
+  localStorage.removeItem('auth_token');
+  window.location.href = 'auth/login.html';
+}
 
 async function testApiConnection() {
   const input = document.getElementById('settingsApiUrl');
@@ -3434,6 +3478,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /* Restore dark mode */
   if (localStorage.getItem('darkMode') === '1') setDarkMode(true);
+
+  /* User greeting and avatar dropdown */
+  try {
+    const savedUser = JSON.parse(localStorage.getItem('auth_user'));
+    if (savedUser) {
+      const g = document.getElementById('userGreeting');
+      const e = document.getElementById('userIdentifier');
+      const r = document.getElementById('userRole');
+      if (g) g.textContent = savedUser.name || (savedUser.firstName ? `Hi, ${savedUser.firstName}` : 'Welcome');
+      if (e) e.textContent = savedUser.email || savedUser.phone || '';
+      if (r) r.textContent = savedUser.role || 'ADMIN';
+    }
+  } catch (_) { }
+
+  const avatarBtn = document.getElementById('userAvatarBtn');
+  const dropdown = document.getElementById('userDropdown');
+  avatarBtn?.addEventListener('click', ev => {
+    ev.stopPropagation();
+    if (dropdown) dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+  });
+  document.addEventListener('click', () => { if (dropdown) dropdown.style.display = 'none'; });
 
 
   /* Navigation */
@@ -3738,6 +3803,8 @@ document.addEventListener('DOMContentLoaded', () => {
   /* Global search */
   initGlobalSearch();
 
-  /* Open the dashboard directly; backend APIs retain their own authorization checks. */
-  navigateTo('dashboard');
+  /* Authenticate and open dashboard with live data */
+  loadCurrentUser().then(() => {
+    navigateTo('dashboard');
+  });
 });

@@ -37,14 +37,22 @@
     }
 
     // Keep localhost overrides local to development and allow secure remote
-    // overrides on other hosts; discard stale localhost values in production.
+    // overrides on other hosts; discard stale remote values in local development.
     try {
       const saved = root.localStorage && root.localStorage.getItem('forecastai_api_url');
       if (saved && saved.trim()) {
         const configured = normalizeApiBase(saved);
-        if (localDevelopment) return configured;
-        if (configured.startsWith('https://')) return configured;
-        root.localStorage.removeItem('forecastai_api_url');
+        if (localDevelopment) {
+          if (configured.includes('localhost') || configured.includes('127.0.0.1')) {
+            return configured;
+          }
+          // Discard stale remote API override when running locally
+          root.localStorage.removeItem('forecastai_api_url');
+        } else if (configured.startsWith('https://')) {
+          return configured;
+        } else {
+          root.localStorage.removeItem('forecastai_api_url');
+        }
       }
     } catch (_) {}
 
